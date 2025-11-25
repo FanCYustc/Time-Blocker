@@ -1,0 +1,5 @@
+{
+  "name": "TimeBlocker 1440",
+  "description": "A daily time-blocking planner inspired by the 1440 minutes philosophy. Plan your day, track actuals, focus with a built-in timer, and export to Obsidian.",
+  "requestFramePermissions": []
+}
