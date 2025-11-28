@@ -4,32 +4,52 @@ import { TimeSlot, ViewMode, SubActivity } from './types';
 import { CategoryPalette } from './components/CategoryPalette';
 import { Timeline } from './components/Timeline';
 import { FocusTimer } from './components/FocusTimer';
+import { StatisticsModal } from './components/StatisticsModal';
+import { TemplateModal } from './components/TemplateModal';
 import { generateMarkdown } from './services/markdown';
-import { Download, Timer, Menu, X, ChevronLeft, ChevronRight, Calendar as CalendarIcon } from 'lucide-react';
+import { Download, Timer, Menu, X, ChevronLeft, ChevronRight, Calendar as CalendarIcon, PieChart, LayoutTemplate } from 'lucide-react';
 
 export default function App() {
+  // --- Data Loading Logic ---
+  const loadDataForDate = (date: string) => {
+    // 1. Try Specific Date Key
+    const key = `slots_${date}`;
+    const saved = localStorage.getItem(key);
+    if (saved) return migrateSlots(JSON.parse(saved));
+
+    // 2. Try Legacy Key (only if date is today)
+    if (date === getTodayDateString()) {
+       const legacy = localStorage.getItem('timeblocker_data');
+       if (legacy) return migrateSlots(JSON.parse(legacy));
+    }
+
+    // 3. Try Template (Auto-fill for new days)
+    const template = localStorage.getItem('timeblocker_template');
+    if (template) {
+        try {
+            const templateSlots = migrateSlots(JSON.parse(template));
+            // Apply template plan to both plan and actual of the new day
+            // Re-map to ensure IDs match valid current time slots if needed, though migrateSlots handles structure
+            return templateSlots.map(ts => ({
+                ...ts,
+                planCategoryId: ts.planCategoryId,
+                planSubActivityId: ts.planSubActivityId,
+                // Requirement: Fill Actual too with the same plan
+                actualCategoryId: ts.planCategoryId,
+                actualSubActivityId: ts.planSubActivityId,
+                note: ''
+            }));
+        } catch(e) { console.warn('Failed to load template', e); }
+    }
+
+    // 4. Default Empty
+    return generateTimeSlots();
+  };
+
   // --- Data State ---
   const [currentDate, setCurrentDate] = useState<string>(getTodayDateString());
   
-  const [slots, setSlots] = useState<TimeSlot[]>(() => {
-    const today = getTodayDateString();
-    const key = `slots_${today}`;
-    const saved = localStorage.getItem(key);
-    
-    if (!saved) {
-      const legacy = localStorage.getItem('timeblocker_data');
-      if (legacy) {
-        const parsed = JSON.parse(legacy);
-        return migrateSlots(parsed);
-      }
-      return generateTimeSlots();
-    }
-    
-    const parsed = JSON.parse(saved);
-    // Simple check if migration needed (based on length or structure)
-    // migrateSlots handles data structure updates too
-    return migrateSlots(parsed);
-  });
+  const [slots, setSlots] = useState<TimeSlot[]>(() => loadDataForDate(getTodayDateString()));
 
   const [subActivities, setSubActivities] = useState<SubActivity[]>(() => {
       const saved = localStorage.getItem('timeblocker_subactivities');
@@ -43,6 +63,8 @@ export default function App() {
   
   const [isMobileMenuOpen, setIsMobileMenuOpen] = useState(false);
   const [activeTimerCategory, setActiveTimerCategory] = useState<string | null>(null);
+  const [isStatsOpen, setIsStatsOpen] = useState(false);
+  const [isTemplateOpen, setIsTemplateOpen] = useState(false);
 
   // --- Persistance ---
   useEffect(() => {
@@ -64,15 +86,8 @@ export default function App() {
 
   const changeDate = (newDate: string) => {
     setCurrentDate(newDate);
-    const key = `slots_${newDate}`;
-    const saved = localStorage.getItem(key);
-    
-    if (saved) {
-        const parsed = JSON.parse(saved);
-        setSlots(migrateSlots(parsed));
-    } else {
-        setSlots(generateTimeSlots());
-    }
+    // Load fresh data for the new date
+    setSlots(loadDataForDate(newDate));
   };
 
   const handlePrevDay = () => changeDate(addDays(currentDate, -1));
@@ -248,6 +263,20 @@ export default function App() {
           </div>
 
           <div className="flex gap-2">
+             <button
+                onClick={() => setIsTemplateOpen(true)}
+                className="p-2 text-gray-500 hover:bg-gray-100 hover:text-gray-800 rounded-full transition-colors cursor-pointer active:scale-95"
+                title="Edit Master Template"
+             >
+                <LayoutTemplate size={20} />
+             </button>
+             <button
+                onClick={() => setIsStatsOpen(true)}
+                className="p-2 text-gray-500 hover:bg-orange-50 hover:text-orange-600 rounded-full transition-colors cursor-pointer active:scale-95"
+                title="View Statistics"
+             >
+                <PieChart size={20} />
+             </button>
              <button 
                 onClick={suggestTimer}
                 className="p-2 text-gray-500 hover:bg-purple-50 hover:text-purple-600 rounded-full transition-colors cursor-pointer active:scale-95"
@@ -356,6 +385,21 @@ export default function App() {
           onClose={() => setActiveTimerCategory(null)} 
         />
       )}
+
+      {/* Statistics Modal */}
+      <StatisticsModal 
+        isOpen={isStatsOpen} 
+        onClose={() => setIsStatsOpen(false)} 
+      />
+
+      {/* Template Modal */}
+      <TemplateModal 
+        isOpen={isTemplateOpen}
+        onClose={() => setIsTemplateOpen(false)}
+        subActivities={subActivities}
+        onAddSubActivity={handleAddSubActivity}
+        onDeleteSubActivity={handleDeleteSubActivity}
+      />
 
     </div>
   );
