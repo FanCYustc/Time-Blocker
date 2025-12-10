@@ -94,7 +94,8 @@ const getSegments = (slots: TimeSlot[], subActivities: SubActivity[], mode: 'pla
 
 const formatSection = (title: string, date: string, blocks: TimeBlock[]): string => {
   let md = `## ${title}\n`;
-  md += `**这是${date}的${title.includes('Plan') ? '日计划' : '实际记录'}**\n\n`;
+  // Standardized subtitle to "日计划" for both sections as per template
+  md += `**这是${date}的日计划**\n\n`;
 
   const morning = blocks.filter(b => b.startHour < 12);
   const afternoon = blocks.filter(b => b.startHour >= 12);
@@ -102,7 +103,8 @@ const formatSection = (title: string, date: string, blocks: TimeBlock[]): string
   md += `### 上午\n`;
   if (morning.length > 0) {
       morning.forEach(b => {
-          md += `- [ ] ${b.startTime} - ${b.endTime} ${b.name}${b.note ? `\n  ${b.note}` : ''}\n`;
+          // Changed format from "- [ ] ..." to "- ..."
+          md += `- ${b.startTime} - ${b.endTime} ${b.name}${b.note ? `\n  ${b.note}` : ''}\n`;
       });
   } else {
       md += `(无记录)\n`;
@@ -111,7 +113,7 @@ const formatSection = (title: string, date: string, blocks: TimeBlock[]): string
   md += `\n### 下午\n`;
   if (afternoon.length > 0) {
       afternoon.forEach(b => {
-           md += `- [ ] ${b.startTime} - ${b.endTime} ${b.name}${b.note ? `\n  ${b.note}` : ''}\n`;
+           md += `- ${b.startTime} - ${b.endTime} ${b.name}${b.note ? `\n  ${b.note}` : ''}\n`;
       });
   } else {
       md += `(无记录)\n`;
@@ -129,27 +131,34 @@ export const generateMarkdown = (slots: TimeSlot[], date: string, subActivities:
   md += `\n\n---\n\n`;
   md += formatSection('Day Planner (Actual)', date, actualBlocks);
 
-  // 2. Mermaid Gantt Chart
-  md += `\n\n## Visualization\n`;
-  md += `\`\`\`mermaid\n`;
+  // 3. Mermaid Gantt Chart - Plan
+  md += `\n\n\`\`\`mermaid\n`;
   md += `gantt\n`;
   md += `    title Daily Timeline ${date}\n`;
   md += `    dateFormat HH:mm\n`;
   md += `    axisFormat %H:%M\n`;
-  md += `    tickInterval 1hour\n`;
-  
+  md += `    tickInterval 2hour\n`;
   md += `    section Plan\n`;
+  
   if (planBlocks.length > 0) {
     planBlocks.forEach(b => {
-        // Sanitize name for mermaid (remove special chars if strictly needed, but basic text usually works)
         const safeName = b.name.replace(/[:#]/g, ' '); 
         md += `    ${safeName} : ${b.startTime}, ${b.endTime}\n`;
     });
   } else {
       md += `    (No Plan) : 00:00, 00:00\n`;
   }
+  md += `\`\`\`\n`;
 
+  // 4. Mermaid Gantt Chart - Actual (Separate Block)
+  md += `\n\n\`\`\`mermaid\n`;
+  md += `gantt\n`;
+  md += `    title Daily Timeline ${date}\n`;
+  md += `    dateFormat HH:mm\n`;
+  md += `    axisFormat %H:%M\n`;
+  md += `    tickInterval 2hour\n`;
   md += `    section Actual\n`;
+
   if (actualBlocks.length > 0) {
     actualBlocks.forEach(b => {
         const safeName = b.name.replace(/[:#]/g, ' ');
